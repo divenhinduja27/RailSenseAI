@@ -14,51 +14,66 @@ public class TicketService {
     private StationRepository stationRepo;
 
     /**
-     * Objective 5 & 8: Passenger Travel Intelligence System
-     * Combines Waitlist Probability with Real-time Network Status.
+     * Objective 5 & 8: Smart Booking Guidance & Ticket Confirmation Prediction
+     * Predicts confirmation probability and recommends optimal booking windows.
      */
     public Map<String, Object> getConfirmationOdds(String trainNo, int currentWL, String destinationCode) {
-        // 1. Demand Modeling (Objective 5)
-        int daysUntilDeparture = 15; // Placeholder for booking window
+        // 1. Demand Modeling [cite: 43, 49]
+        // Mocking days until departure; in production, this would come from the PNR/Schedule
+        int daysUntilDeparture = 15;
 
-        // Base probability calculation based on WL number and time buffer
+        // Base probability calculation based on WL number [cite: 50, 55]
         double baseProb = 100.0 - (currentWL * 1.5);
         double timeBonus = daysUntilDeparture * 1.2;
         double finalProbability = Math.min(99.0, Math.max(5.0, baseProb + (timeBonus / 2)));
 
-        // 2. Network Awareness (Connecting Induced Delays)
-        // Checks if the destination station is currently reporting disruptions (Part 2 & 3)
-        // 2. Network Awareness (Connecting Induced Delays) [cite: 23, 26]
-        // findById is used because stationCode is the @Id in our Neo4j Station entity
+        // 2. Network Awareness (Infrastructure & Operational Layer) [cite: 11, 26]
         String areaStatus = stationRepo.findById(destinationCode)
                 .map(Station::getStatus)
                 .orElse("CLEAR");
+
+        // 3. Smart Booking Recommendation (GAP FIX)
+        // Algorithm: Higher WL + High-Demand Corridors = Earlier Booking Required
+        int recommendedDays = calculateIdealBookingWindow(currentWL, destinationCode);
 
         Map<String, Object> response = new HashMap<>();
         response.put("trainNo", trainNo);
         response.put("currentWL", currentWL);
         response.put("confirmationProbability", String.format("%.2f%%", finalProbability));
         response.put("destinationStatus", areaStatus);
+        response.put("recommendedAdvanceBookingDays", recommendedDays); // New required field [cite: 56]
 
-        // 3. Smart Booking Guidance (Objective 8)
-        // Personalized guidance driven by live network analytics
-        String advice;
-        if (finalProbability > 70) {
-            if ("CLEAR".equals(areaStatus)) {
-                advice = "High confirmation chance and clear route. Safe to book.";
-            } else {
-                // Critical Insight: Seat might confirm, but travel will be difficult
-                advice = "Seat likely to confirm, but destination " + destinationCode +
-                        " is currently experiencing cascading delays. Expect disruptions upon arrival.";
-            }
-        } else if (finalProbability > 40) {
-            advice = "Moderate risk. Confirmation uncertain; monitor network congestion hotspots at " + destinationCode + ".";
-        } else {
-            // Suggesting alternatives when reliability is low
-            advice = "Low confirmation probability. System recommends searching for alternative routes via more resilient nodes.";
-        }
-
+        // 4. Passenger Intelligence Guidance [cite: 78, 106]
+        String advice = generateSmartAdvice(finalProbability, areaStatus, destinationCode, recommendedDays);
         response.put("travelAdvice", advice);
+
         return response;
+    }
+
+    /**
+     * Logic to recommend how many days in advance to book
+     */
+    private int calculateIdealBookingWindow(int wl, String code) {
+        // Base window is 30 days
+        int window = 30;
+        // Increase window based on waitlist severity
+        if (wl > 50) window += 15;
+        if (wl > 100) window += 30;
+        // High-impact hubs (like BPL) require even more lead time [cite: 59, 61]
+        if ("BPL".equals(code) || "NDLS".equals(code)) window += 10;
+
+        return window;
+    }
+
+    private String generateSmartAdvice(double prob, String status, String code, int days) {
+        if (prob > 70) {
+            return "CLEAR".equals(status)
+                    ? "High confirmation chance. Safe to book. For future trips on this route, book " + days + " days in advance."
+                    : "Seat likely to confirm, but " + code + " has cascading delays. Expect disruptions[cite: 24, 110].";
+        } else if (prob > 40) {
+            return "Moderate risk. We recommend booking " + days + " days in advance to secure a 'Confirmed' status[cite: 56].";
+        } else {
+            return "Low probability. System recommends alternative routes or booking at least " + (days + 20) + " days earlier[cite: 57, 82].";
+        }
     }
 }

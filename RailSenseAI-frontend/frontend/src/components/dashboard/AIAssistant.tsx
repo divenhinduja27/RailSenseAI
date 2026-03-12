@@ -4,12 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { ChatMessage, sampleChatResponses } from "@/data/mock-data";
+import { railApi } from "@/lib/api";
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+}
 
 const suggestedQueries = [
-  "Which stations are most vulnerable to delays today?",
-  "Show me current congestion hotspots",
-  "What's the ticket confirmation for Delhi-Mumbai Rajdhani?",
+  "Which stations are most vulnerable to cascading delays today?",
+  "Show me the current network resilience report",
+  "What's the ticket confirmation odds for train 12622 at BPL?",
 ];
 
 const AIAssistant = ({ embedded = false }: { embedded?: boolean }) => {
@@ -17,7 +24,7 @@ const AIAssistant = ({ embedded = false }: { embedded?: boolean }) => {
     {
       id: "0",
       role: "assistant",
-      content: sampleChatResponses.default,
+      content: "System Initialized. I am your backend-powered SLM Assistant. You can ask me about network topology, congestion, or ticket odds.",
       timestamp: new Date().toISOString(),
     },
   ]);
@@ -29,7 +36,7 @@ const AIAssistant = ({ embedded = false }: { embedded?: boolean }) => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = (text: string) => {
+  const sendMessage = async (text: string) => {
     if (!text.trim()) return;
 
     const userMsg: ChatMessage = {
@@ -43,23 +50,29 @@ const AIAssistant = ({ embedded = false }: { embedded?: boolean }) => {
     setInput("");
     setTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const lower = text.toLowerCase();
-      let response = sampleChatResponses.default;
-      if (lower.includes("delay") || lower.includes("vulnerable")) response = sampleChatResponses.delay;
-      else if (lower.includes("congestion") || lower.includes("hotspot") || lower.includes("crowd")) response = sampleChatResponses.congestion;
-      else if (lower.includes("ticket") || lower.includes("confirmation") || lower.includes("booking")) response = sampleChatResponses.ticket;
-
+    try {
+      // PRO MOVE: Your unified Spring Boot controller handles the context internally.
+      // We just send the query to /api/v1/rail-intelligence/ai/chat
+      const aiResponseText = await railApi.chatWithAI(text);
+      
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: response,
+        content: aiResponseText,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
+    } catch (error) {
+      console.error("AI Handshake Failed:", error);
+      setMessages((prev) => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Error: Could not reach the intelligence layer. Ensure your Spring Boot backend is running.",
+        timestamp: new Date().toISOString(),
+      }]);
+    } finally {
       setTyping(false);
-    }, 1200);
+    }
   };
 
   const containerClass = embedded
@@ -68,19 +81,17 @@ const AIAssistant = ({ embedded = false }: { embedded?: boolean }) => {
 
   return (
     <div className={containerClass}>
-      {/* Header */}
       <div className="p-4 border-b border-border flex items-center gap-3">
         <div className="p-2 rounded-lg bg-primary/10">
           <Bot className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h3 className="font-semibold text-sm">Railway AI Assistant</h3>
-          <p className="text-xs text-muted-foreground">Powered by SLM • Real-time insights</p>
+          <h3 className="font-semibold text-sm">Railway SLM Assistant</h3>
+          <p className="text-xs text-muted-foreground">Connected to Unified Spring Engine</p>
         </div>
         <Sparkles className="h-4 w-4 text-primary ml-auto" />
       </div>
 
-      {/* Messages */}
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           {messages.map((msg) => (
@@ -88,18 +99,8 @@ const AIAssistant = ({ embedded = false }: { embedded?: boolean }) => {
               <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0", msg.role === "assistant" ? "bg-primary/10" : "bg-secondary")}>
                 {msg.role === "assistant" ? <Bot className="h-4 w-4 text-primary" /> : <User className="h-4 w-4 text-muted-foreground" />}
               </div>
-              <div className={cn("max-w-[80%] rounded-xl px-4 py-3 text-sm leading-relaxed", msg.role === "assistant" ? "bg-secondary/60" : "bg-primary/10 text-foreground")}>
-                {msg.content.split("\n").map((line, i) => (
-                  <p key={i} className={cn(line === "" && "h-2")}>
-                    {line.split(/(\*\*.*?\*\*)/).map((part, j) =>
-                      part.startsWith("**") && part.endsWith("**") ? (
-                        <strong key={j} className="text-foreground font-semibold">{part.slice(2, -2)}</strong>
-                      ) : (
-                        <span key={j}>{part}</span>
-                      )
-                    )}
-                  </p>
-                ))}
+              <div className={cn("max-w-[80%] rounded-xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap", msg.role === "assistant" ? "bg-secondary/60" : "bg-primary/10 text-foreground")}>
+                {msg.content}
               </div>
             </div>
           ))}
@@ -121,7 +122,6 @@ const AIAssistant = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       </ScrollArea>
 
-      {/* Suggestions */}
       {messages.length <= 1 && (
         <div className="px-4 pb-2 flex flex-wrap gap-2">
           {suggestedQueries.map((q) => (
@@ -136,19 +136,15 @@ const AIAssistant = ({ embedded = false }: { embedded?: boolean }) => {
         </div>
       )}
 
-      {/* Input */}
       <div className="p-4 border-t border-border">
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            sendMessage(input);
-          }}
+          onSubmit={(e) => { e.preventDefault(); sendMessage(input); }}
           className="flex gap-2"
         >
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about delays, congestion, tickets..."
+            placeholder="Ask AI about network status..."
             className="flex-1 bg-secondary/60 border-border"
           />
           <Button type="submit" size="icon" disabled={!input.trim() || typing}>

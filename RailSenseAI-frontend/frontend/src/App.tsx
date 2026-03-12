@@ -4,6 +4,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
+// Import the WebSocket hook we discussed
+import { useWebSocket } from "@/hooks/useWebSocket"; 
+
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import DashboardLayout from "./layouts/DashboardLayout";
@@ -20,32 +23,38 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<DashboardLayout />}>
-            <Route index element={<DashboardHome />} />
-            <Route path="network" element={<NetworkPage />} />
-            <Route path="delays" element={<DelaysPage />} />
-            <Route path="routes" element={<RoutesPage />} />
-            <Route path="congestion" element={<CongestionPage />} />
-            <Route path="tickets" element={<TicketsPage />} />
-            <Route path="ai-assistant" element={<AIAssistantPage />} />
-            <Route path="resilience" element={<ResiliencePage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  // This is the "Integration Master Stroke": 
+  // The app starts listening to your Spring Boot WebSocket the moment it loads.
+  useWebSocket(); 
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/dashboard" element={<DashboardLayout />}>
+              <Route index element={<DashboardHome />} />
+              <Route path="network" element={<NetworkPage />} />
+              <Route path="delays" element={<DelaysPage />} />
+              <Route path="routes" element={<RoutesPage />} />
+              <Route path="congestion" element={<CongestionPage />} />
+              <Route path="tickets" element={<TicketsPage />} />
+              <Route path="ai-assistant" element={<AIAssistantPage />} />
+              <Route path="resilience" element={<ResiliencePage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

@@ -1,17 +1,30 @@
-import { stations } from "@/data/mock-data";
-import { Shield, AlertTriangle, Network } from "lucide-react";
+import { useEffect, useState } from "react";
+import { railApi } from "@/lib/api";
+import { Shield, AlertTriangle, Network, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 
-// Mock resilience scores
-const resilienceData = stations.map((s) => ({
-  ...s,
-  centralityScore: Math.random() * 100,
-  vulnerabilityScore: Math.round(s.congestionLevel * 0.8 + Math.random() * 20),
-  redundancy: Math.round(40 + Math.random() * 50),
-})).sort((a, b) => b.vulnerabilityScore - a.vulnerabilityScore);
-
 const ResiliencePanel = () => {
+  const [resilienceData, setResilienceData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchResilience = async () => {
+      try {
+        // We pass default stations for the initial report
+        const data = await railApi.getResilience("NDLS", "MAS");
+        setResilienceData(data);
+      } catch (e) {
+        console.error("Resilience Engine Failure", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchResilience();
+  }, []);
+
+  if (loading) return <div className="p-10 text-center"><Loader2 className="animate-spin inline mr-2" /> Loading Neo4j Centrality Analysis...</div>;
+
   return (
     <div className="space-y-6">
       <div className="glass-card p-5">
@@ -20,58 +33,46 @@ const ResiliencePanel = () => {
             <Shield className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold text-lg">Network Resilience Analysis</h3>
-            <p className="text-sm text-muted-foreground">Infrastructure vulnerability & redundancy assessment</p>
+            <h3 className="font-semibold text-lg">Infrastructure Vulnerability (Objective 6)</h3>
+            <p className="text-sm text-muted-foreground">Live Betweenness & Centrality ranking from Neo4j</p>
           </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3 mb-6">
           <div className="p-4 rounded-lg bg-secondary/40 border border-border">
-            <div className="text-xs text-muted-foreground mb-1">Network Health</div>
-            <div className="stat-value text-success">91%</div>
+            <div className="text-xs text-muted-foreground mb-1">Graph Nodes</div>
+            <div className="stat-value text-success">{resilienceData.totalNodes || 0}</div>
           </div>
           <div className="p-4 rounded-lg bg-secondary/40 border border-border">
-            <div className="text-xs text-muted-foreground mb-1">Critical Nodes</div>
-            <div className="stat-value text-destructive">4</div>
+            <div className="text-xs text-muted-foreground mb-1">Vulnerability Index</div>
+            <div className="stat-value text-destructive">{resilienceData.vulnerabilityScore || "High"}</div>
           </div>
           <div className="p-4 rounded-lg bg-secondary/40 border border-border">
-            <div className="text-xs text-muted-foreground mb-1">Avg Redundancy</div>
-            <div className="stat-value text-primary">67%</div>
+            <div className="text-xs text-muted-foreground mb-1">Route Redundancy</div>
+            <div className="stat-value text-primary">{resilienceData.redundancyCount || 0}</div>
           </div>
         </div>
 
         <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-warning" />
-          Station Vulnerability Ranking
+          Critical Corridor Analysis
         </h4>
 
         <div className="space-y-3">
-          {resilienceData.slice(0, 8).map((station, i) => (
-            <div key={station.id} className="flex items-center gap-4 p-3 rounded-lg bg-secondary/20">
+          {/* Displaying the "Crucial Hubs" identified by your Java Centrality logic */}
+          {(resilienceData.criticalNodes || []).map((node: any, i: number) => (
+            <div key={node.code} className="flex items-center gap-4 p-3 rounded-lg bg-secondary/20">
               <span className="text-xs font-mono text-muted-foreground w-5">{i + 1}.</span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm">{station.name}</span>
-                  <span className="text-xs text-muted-foreground">{station.code}</span>
+                  <span className="font-medium text-sm">{node.name}</span>
+                  <span className="text-xs text-muted-foreground">{node.code}</span>
                 </div>
-                <div className="flex items-center gap-4 mt-1.5">
-                  <div className="flex-1">
-                    <div className="text-[10px] text-muted-foreground mb-0.5">Vulnerability</div>
-                    <Progress value={station.vulnerabilityScore} className="h-1.5" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-[10px] text-muted-foreground mb-0.5">Redundancy</div>
-                    <Progress value={station.redundancy} className="h-1.5" />
-                  </div>
+                <div className="mt-2">
+                  <div className="text-[10px] text-muted-foreground mb-1">Influence Score (Betweenness)</div>
+                  <Progress value={node.centralityScore} className="h-1.5" />
                 </div>
               </div>
-              <span className={cn(
-                "text-sm font-bold font-mono",
-                station.vulnerabilityScore >= 70 ? "text-destructive" :
-                station.vulnerabilityScore >= 50 ? "text-warning" : "text-success"
-              )}>
-                {station.vulnerabilityScore}
-              </span>
             </div>
           ))}
         </div>
@@ -80,13 +81,11 @@ const ResiliencePanel = () => {
       <div className="glass-card p-5">
         <h3 className="font-semibold mb-3 flex items-center gap-2">
           <Network className="h-4 w-4 text-primary" />
-          Resilience Insights
+          AI Intelligence Insights
         </h3>
-        <ul className="space-y-2 text-sm text-muted-foreground">
-          <li className="flex items-start gap-2"><span className="text-destructive mt-1">•</span>Mumbai CST and New Delhi are single points of failure for 40% of long-distance routes</li>
-          <li className="flex items-start gap-2"><span className="text-warning mt-1">•</span>Howrah–Vijayawada corridor has limited alternative routing options</li>
-          <li className="flex items-start gap-2"><span className="text-success mt-1">•</span>Northern plains network has good redundancy through parallel routes</li>
-        </ul>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {resilienceData.aiSummary || "Select corridors to generate a real-time infrastructure resilience report based on current graph status."}
+        </p>
       </div>
     </div>
   );

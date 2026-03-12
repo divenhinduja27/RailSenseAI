@@ -13,9 +13,8 @@ public class CorsConfig {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                // This allows the Angular (4200) and FastAPI (8000) apps to talk to you
-                registry.addMapping("/api/v1/**")
-                        .allowedOrigins("http://localhost:4200", "http://localhost:8000")
+                registry.addMapping("/**") // Apply to all API paths
+                        .allowedOriginPatterns("*") // 🚀 This is the fix for wildcard + credentials
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
