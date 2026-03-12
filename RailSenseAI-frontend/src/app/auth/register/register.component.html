@@ -1,0 +1,37 @@
+<div class="login-container">
+
+  <div class="login-card">
+
+    <h1 class="title">RailSenseAI</h1>
+    <p class="subtitle">Create your account</p>
+
+    <form (ngSubmit)="register()" #registerForm="ngForm">
+
+      <div class="input-group">
+        <label>Name</label>
+        <input type="text" name="name" [(ngModel)]="user.name" required>
+      </div>
+
+      <div class="input-group">
+        <label>Email</label>
+        <input type="email" name="email" [(ngModel)]="user.email" required>
+      </div>
+
+      <div class="input-group">
+        <label>Password</label>
+        <input type="password" name="password" [(ngModel)]="user.password" required>
+      </div>
+
+      <button class="login-btn">Register</button>
+      
+
+      <p class="signup-link">
+        Already have an account?
+        <a routerLink="/login">Login</a>
+      </p>
+
+    </form>
+
+  </div>
+
+</div>
