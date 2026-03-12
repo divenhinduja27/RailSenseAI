@@ -1,27 +1,40 @@
 package com.RailSenseAI_backend.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import org.springframework.data.neo4j.core.schema.Id;
+import org.springframework.data.neo4j.core.schema.Node;
+import org.springframework.data.neo4j.core.schema.Relationship;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.util.ArrayList;
+import java.util.List;
 
-@Entity
-@Table(name = "stations")
+@Node("Station") // stations represent nodes
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class Station {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String stationCode; // unique identifier
 
-    @Column(unique = true, nullable = false)
-    private String stationCode; // e.g., "NDLS" [cite: 15]
+    private String name;
 
-    private String name; // e.g., "New Delhi"
-
-    private Double latitude; // Needed for Angular Leaflet/Google Maps [cite: 108]
+    private Double latitude; // Needed for Dashboard/Map visualization [cite: 108]
     private Double longitude;
 
-    // Status can be "CLEAR", "CONGESTED", or "DELAYED" [cite: 36, 119]
+    // Status can be "CLEAR", "CONGESTED", or "CRITICAL_DELAY" [cite: 36, 119]
     private String status;
+
+    // rail connections represent edges [cite: 16]
+    @Relationship(type = "CONNECTED_TO", direction = Relationship.Direction.OUTGOING)
+    private List<RouteConnection> connections = new ArrayList<>();
+
+    // Custom Constructor to prevent NullPointerException in getConnections()
+    public Station(String stationCode, String name, Double latitude, Double longitude, String status, List<RouteConnection> connections) {
+        this.stationCode = stationCode;
+        this.name = name;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.status = status;
+        this.connections = (connections != null) ? connections : new ArrayList<>();
+    }
 }

@@ -14,21 +14,23 @@ public class TicketService {
     private StationRepository stationRepo;
 
     /**
-     * Objective 5 & 8: Passenger Travel Intelligence System [cite: 47, 78]
+     * Objective 5 & 8: Passenger Travel Intelligence System
      * Combines Waitlist Probability with Real-time Network Status.
      */
     public Map<String, Object> getConfirmationOdds(String trainNo, int currentWL, String destinationCode) {
-        // 1. Demand Modeling (Objective 5) [cite: 49, 50]
-        int daysUntilDeparture = 15; // Placeholder for booking window [cite: 56]
+        // 1. Demand Modeling (Objective 5)
+        int daysUntilDeparture = 15; // Placeholder for booking window
 
-        // Base probability calculation based on WL number and time buffer [cite: 51]
+        // Base probability calculation based on WL number and time buffer
         double baseProb = 100.0 - (currentWL * 1.5);
         double timeBonus = daysUntilDeparture * 1.2;
         double finalProbability = Math.min(99.0, Math.max(5.0, baseProb + (timeBonus / 2)));
 
-        // 2. Network Awareness (Connecting Induced Delays) [cite: 23, 114]
-        // This checks if the user's destination is currently CONGESTED via your Postman action
-        String areaStatus = stationRepo.findByStationCode(destinationCode)
+        // 2. Network Awareness (Connecting Induced Delays)
+        // Checks if the destination station is currently reporting disruptions (Part 2 & 3)
+        // 2. Network Awareness (Connecting Induced Delays) [cite: 23, 26]
+        // findById is used because stationCode is the @Id in our Neo4j Station entity
+        String areaStatus = stationRepo.findById(destinationCode)
                 .map(Station::getStatus)
                 .orElse("CLEAR");
 
@@ -38,18 +40,22 @@ public class TicketService {
         response.put("confirmationProbability", String.format("%.2f%%", finalProbability));
         response.put("destinationStatus", areaStatus);
 
-        // 3. Smart Booking Guidance (Objective 8) [cite: 83, 106]
-        // Generates personalized guidance based on network analytics [cite: 106]
+        // 3. Smart Booking Guidance (Objective 8)
+        // Personalized guidance driven by live network analytics
         String advice;
         if (finalProbability > 70) {
-            advice = areaStatus.equals("CLEAR")
-                    ? "High confirmation chance and clear route. Safe to book." // [cite: 55]
-                    : "Seat likely, but route is currently experiencing cascading delays. Expect disruptions."; // [cite: 27]
+            if ("CLEAR".equals(areaStatus)) {
+                advice = "High confirmation chance and clear route. Safe to book.";
+            } else {
+                // Critical Insight: Seat might confirm, but travel will be difficult
+                advice = "Seat likely to confirm, but destination " + destinationCode +
+                        " is currently experiencing cascading delays. Expect disruptions upon arrival.";
+            }
         } else if (finalProbability > 40) {
-            advice = "Moderate risk. Confirmation uncertain; monitor network congestion hotspots."; // [cite: 36, 51]
+            advice = "Moderate risk. Confirmation uncertain; monitor network congestion hotspots at " + destinationCode + ".";
         } else {
-            // Suggesting alternatives when confirmation or reliability is low [cite: 57, 82]
-            advice = "Low confirmation probability. Highly recommend searching for alternative routes."; // [cite: 57, 82]
+            // Suggesting alternatives when reliability is low
+            advice = "Low confirmation probability. System recommends searching for alternative routes via more resilient nodes.";
         }
 
         response.put("travelAdvice", advice);
