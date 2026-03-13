@@ -3,6 +3,7 @@ package com.RailSenseAI_backend.config;
 import com.RailSenseAI_backend.entity.Station;
 import com.RailSenseAI_backend.entity.RouteConnection;
 import com.RailSenseAI_backend.repository.StationRepository;
+
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,49 +20,71 @@ public class DataInitializer {
 
     @Bean
     CommandLineRunner initDatabase(StationRepository stationRepo) {
+
         return args -> {
-            // Objective 1: Dynamic Railway Network Modeling
-            if (stationRepo.count() == 0) {
-                System.out.println("RAILSENSE: No existing graph found. Loading global datasets...");
+
+            if (true) {
+
+                System.out.println("RAILSENSE: Loading railway graph dataset...");
 
                 Map<String, Station> stationMap = new HashMap<>();
 
                 try {
-                    // 1. Read the Stations CSV
-                    BufferedReader stationReader = new BufferedReader(new InputStreamReader(
-                            new ClassPathResource("stations.csv").getInputStream()));
+
+                    BufferedReader stationReader =
+                            new BufferedReader(new InputStreamReader(
+                                    new ClassPathResource("stations.csv").getInputStream()));
 
                     String line;
-                    boolean isFirstLine = true;
-                    while ((line = stationReader.readLine()) != null) {
-                        if (isFirstLine) { isFirstLine = false; continue; } // Skip header
+                    boolean first = true;
 
-                        String[] data = line.split(",");
+                    while ((line = stationReader.readLine()) != null) {
+
+                        if (first) {
+                            first = false;
+                            continue;
+                        }
+
+                        String[] data = line.split(",", -1);
+
                         if (data.length >= 4) {
+
                             String code = data[0].trim();
                             String name = data[1].trim();
+
                             double lng = Double.parseDouble(data[2].trim());
                             double lat = Double.parseDouble(data[3].trim());
 
-                            // Create the Node with a default CLEAR status
-                            Station station = new Station(code, name, lat, lng, "CLEAR", new ArrayList<>());
+                            Station station =
+                                    new Station(code, name, lat, lng, "CLEAR");
+
                             stationMap.put(code, station);
                         }
                     }
+
                     stationReader.close();
-                    System.out.println("RAILSENSE: Loaded " + stationMap.size() + " Station Nodes.");
 
-                    // 2. Read the Routes CSV and build Edges
-                    BufferedReader routeReader = new BufferedReader(new InputStreamReader(
-                            new ClassPathResource("routes.csv").getInputStream()));
+                    System.out.println("RAILSENSE: Stations loaded: " + stationMap.size());
 
-                    isFirstLine = true;
+
+                    BufferedReader routeReader =
+                            new BufferedReader(new InputStreamReader(
+                                    new ClassPathResource("routes.csv").getInputStream()));
+
+                    first = true;
                     int edgeCount = 0;
-                    while ((line = routeReader.readLine()) != null) {
-                        if (isFirstLine) { isFirstLine = false; continue; } // Skip header
 
-                        String[] data = line.split(",");
+                    while ((line = routeReader.readLine()) != null) {
+
+                        if (first) {
+                            first = false;
+                            continue;
+                        }
+
+                        String[] data = line.split(",", -1);
+
                         if (data.length >= 2) {
+
                             String sourceCode = data[0].trim();
                             String destCode = data[1].trim();
 
@@ -69,26 +92,35 @@ public class DataInitializer {
                             Station dest = stationMap.get(destCode);
 
                             if (source != null && dest != null) {
-                                // Defaulting distance/weight to 500 for demo purposes (you can calculate Haversine later)
-                                // Change 500.0 (double) to 500 (Integer) to satisfy the constructor
-                                RouteConnection connection = new RouteConnection(null, dest, 500, 0);
+
+                                RouteConnection connection =
+                                        new RouteConnection(dest, 500, 0);
+
                                 source.getConnections().add(connection);
+
                                 edgeCount++;
                             }
                         }
                     }
-                    routeReader.close();
-                    System.out.println("RAILSENSE: Loaded " + edgeCount + " Route Edges.");
 
-                    // 3. Save the entire massive graph to Neo4j
+                    routeReader.close();
+
+                    System.out.println("RAILSENSE: Routes loaded: " + edgeCount);
+
                     stationRepo.saveAll(stationMap.values());
-                    System.out.println("RAILSENSE: Live Global Dataset successfully ingested into Neo4j Graph Engine!");
+
+                    System.out.println("RAILSENSE: Graph successfully loaded into Neo4j.");
 
                 } catch (Exception e) {
-                    System.err.println("RAILSENSE CRITICAL ERROR: Could not load global CSVs. " + e.getMessage());
+
+                    System.err.println("RAILSENSE ERROR: Failed to load CSV dataset.");
+
+                    e.printStackTrace();
                 }
-            } else {
-                System.out.println("RAILSENSE: Graph Topology already populated in Neo4j. Ready for simulation.");
+            }
+            else {
+
+                System.out.println("RAILSENSE: Graph already exists in Neo4j.");
             }
         };
     }

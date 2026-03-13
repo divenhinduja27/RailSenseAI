@@ -47,51 +47,40 @@ public class RailwayService {
     }
 
     public List<String> predictDelayCascade(String startStationCode, int initialDelayMinutes) {
+
+        Set<String> uniqueStations = new HashSet<>();
         List<String> affectedStations = new ArrayList<>();
-        Queue<Map.Entry<String, Integer>> queue = new LinkedList<>();
-        Set<String> visited = new HashSet<>();
-        queue.add(new AbstractMap.SimpleEntry<>(startStationCode, initialDelayMinutes));
-        visited.add(startStationCode);
 
-        while (!queue.isEmpty()) {
-            Map.Entry<String, Integer> currentEntry = queue.poll();
-            String currentCode = currentEntry.getKey();
-            int currentDelay = currentEntry.getValue();
-            Station currentStation = stationRepo.findById(currentCode).orElse(null);
+        Station start = stationRepo.findById(startStationCode).orElse(null);
 
-            if (currentStation != null && currentStation.getConnections() != null) {
-                for (RouteConnection route : currentStation.getConnections()) {
-                    Station targetStation = route.getTargetStation();
-                    String targetCode = targetStation.getStationCode();
-                    if (!visited.contains(targetCode)) {
-                        int bufferRecovery = (int) (route.getDistance() / 100) * 2;
-                        int propagatedDelay = Math.max(5, currentDelay - bufferRecovery);
-                        route.setDelayMinutes(propagatedDelay);
-                        stationRepo.save(currentStation);
-                        String status = propagatedDelay > 30 ? "CRITICAL_DELAY" : "CONGESTED";
-                        targetStation.setStatus(status);
-                        stationRepo.save(targetStation);
-                        affectedStations.add(targetStation.getName() + " (Est. Delay: " + propagatedDelay + "m)");
-                        NetworkLog log = new NetworkLog();
-                        log.setTriggerStation(startStationCode);
-                        log.setAffectedStation(targetCode);
-                        log.setDelayMinutes(propagatedDelay);
-                        log.setTimestamp(LocalDateTime.now());
-                        logRepo.save(log);
-                        if (propagatedDelay > 10) {
-                            queue.add(new AbstractMap.SimpleEntry<>(targetCode, propagatedDelay));
-                            visited.add(targetCode);
-                        }
-                    }
-                }
+        if (start == null) {
+            affectedStations.add("Station not found");
+            return affectedStations;
+        }
+
+        if (start.getConnections() == null) {
+            affectedStations.add("No connected stations");
+            return affectedStations;
+        }
+
+        for (RouteConnection rc : start.getConnections()) {
+
+            Station neighbor = rc.getTargetStation();
+
+            int propagatedDelay = Math.max(5, initialDelayMinutes - 10);
+
+            if (!uniqueStations.contains(neighbor.getStationCode())) {
+
+                uniqueStations.add(neighbor.getStationCode());
+
+                affectedStations.add(
+                        neighbor.getName() + " (Est. Delay: " + propagatedDelay + "m)"
+                );
             }
         }
-        if (!affectedStations.isEmpty()) {
-            messagingTemplate.convertAndSend("/topic/network-updates", "CRITICAL: Delay cascade triggered from " + startStationCode);
-        }
+
         return affectedStations;
     }
-
     // FIXED: Simplified the Map extraction to avoid ClassCastException
     public Map<String, Object> analyzeNetworkResilience(String sourceCode, String targetCode) {
         Map<String, Object> resilienceData = new HashMap<>();
@@ -117,14 +106,18 @@ public class RailwayService {
         List<String> routeResults = new ArrayList<>();
 
         if (safePath != null && !safePath.isEmpty()) {
+
             String pathString = safePath.stream()
                     .map(Station::getStationCode)
                     .collect(Collectors.joining(" -> "));
+
             routeResults.add("Optimization: Found safe route via -> " + pathString);
             resilienceData.put("vulnerabilityStatus", "STABLE");
+
         } else {
-            routeResults.add("CRITICAL: No clear paths available. Entire corridor is congested.");
-            resilienceData.put("vulnerabilityStatus", "HIGH RISK");
+
+            routeResults.add("No optimized route found. Network may be partially disconnected.");
+            resilienceData.put("vulnerabilityStatus", "UNKNOWN");
         }
 
         resilienceData.put("optimizedAlternativeRoutes", routeResults);

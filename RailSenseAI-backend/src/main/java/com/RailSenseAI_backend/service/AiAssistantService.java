@@ -1,70 +1,78 @@
 package com.RailSenseAI_backend.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 public class AiAssistantService {
 
-    @Autowired
-    private RailwayService railwayService;
+    private final String AI_BASE_URL = "http://localhost:8001";
+    private final RestTemplate restTemplate = new RestTemplate();
 
     /**
-     * Objective 9: SLM / LLM Assistant Component
-     * Interprets structured graph data, executes commands, and provides natural language insights.
+     * Sends the user query to FastAPI AI service
      */
     public String processAiQuery(String userQuery) {
-        String query = userQuery.toLowerCase();
 
-        // 🚀 1. THE ACTION INTERCEPTOR (Command Execution)
-        // If the user wants to trigger a delay, do it here instead of just talking about it.
-        if (query.contains("simulate") || query.contains("induce")) {
+        String url = AI_BASE_URL + "/chat?query=" + userQuery.replace(" ", "%20");
 
-            // Basic NLP to extract parameters for the demo
-            String targetStation = query.contains("ndls") ? "NDLS" : "BPL";
-            int delayMins = query.contains("60") ? 60 : 45;
-
-            // ACTUALLY TRIGGER THE DELAY IN THE BACKEND ENGINE!
-            railwayService.predictDelayCascade(targetStation, delayMins);
-
-            // Return immediate confirmation
-            return "🚨 **COMMAND EXECUTED**: Induced a " + delayMins + "-minute delay at " + targetStation + ".\n\n" +
-                    "**SYSTEM UPDATE:** The graph traversal engine has been engaged. " +
-                    "Cascading impacts are currently being calculated and pushed to the UI via WebSockets. " +
-                    "Ask me for a 'Status Report' to see the live active disruptions.";
+        try {
+            return restTemplate.getForObject(url, String.class);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "AI Service error";
         }
+    }
 
-        // 🔍 2. THE LIVE GRAPH READER (Status Checking)
-        // If it wasn't a command, fetch the REAL-TIME system context before answering.
-        // This ensures the AI knows about the delay you just induced!
-        String systemContext = railwayService.getSystemSnapshotForAI();
+    /**
+     * Smart Route Recommendation
+     */
+    public Object getSmartRoute(String source, String destination) {
 
-        // 🧠 3. INTENT DETECTION & RESPONSE GENERATION
-        if (query.contains("status") || query.contains("active") || query.contains("report")) {
-            return "**ANALYSIS: RAILSENSE-AI SYSTEM STATUS REPORT:**\n" +
-                    systemContext + "\n\n" +
-                    "**STRATEGIC ADVICE:** If the snapshot above shows active disruptions, immediate rerouting protocols are recommended to prevent further graph congestion.";
-        }
+        String url = UriComponentsBuilder
+                .fromHttpUrl(AI_BASE_URL + "/smart-route")
+                .queryParam("source", source)
+                .queryParam("destination", destination)
+                .toUriString();
 
-        else if (query.contains("vulnerable") || query.contains("disruption") || query.contains("delay")) {
-            return "ANALYSIS: " + systemContext +
-                    "\n\nOPERATIONAL ADVICE: Based on graph centrality, BPL and NDLS are current high-impact hubs. " +
-                    "Any delay cascade here will affect 75% of the corridor. Suggesting proactive scheduling adjustments.";
-        }
+        return restTemplate.getForObject(url, Object.class);
+    }
 
-        else if (query.contains("waitlist") || query.contains("confirm") || query.contains("ticket")) {
-            return "PASSENGER INTELLIGENCE: Ticket confirmation probabilities are calculated based on historical clearance and " +
-                    "current corridor utilization. For high-demand routes, booking 45 days in advance is recommended.";
-        }
+    /**
+     * Delay Cascade Impact
+     */
+    public Object getDelayImpact(String station) {
 
-        else if (query.contains("route") || query.contains("alternate")) {
-            return "ROUTING INSIGHT: If the central corridor is congested, the system has successfully identified a Western bypass via Mumbai (MUM) " +
-                    "that maintains operational feasibility with minimal travel time increase.";
-        }
+        String url = UriComponentsBuilder
+                .fromHttpUrl(AI_BASE_URL + "/delay-impact")
+                .queryParam("station", station)
+                .toUriString();
 
-        // Default Fallback
-        return "I am the RailSense-AI SLM Assistant.\n\n" +
-                "CURRENT GRAPH CONTEXT:\n" + systemContext +
-                "\n\nHow else can I assist with your railway operations today? *(Try typing: 'Induce a 45 minute delay at BPL')*";
+        return restTemplate.getForObject(url, Object.class);
+    }
+
+    /**
+     * Station Demand Analysis
+     */
+    public Object getStationDemand(String station) {
+
+        String url = UriComponentsBuilder
+                .fromHttpUrl(AI_BASE_URL + "/station-demand")
+                .queryParam("station", station)
+                .toUriString();
+
+        return restTemplate.getForObject(url, Object.class);
+    }
+
+    /**
+     * Critical Station Detection
+     */
+    public Object getCriticalStations() {
+
+        return restTemplate.getForObject(
+                AI_BASE_URL + "/critical-stations",
+                Object.class
+        );
     }
 }

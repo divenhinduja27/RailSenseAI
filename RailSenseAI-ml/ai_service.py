@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import networkx as nx
 import joblib
@@ -8,6 +9,16 @@ import ollama
 print("RUNNING FILE:", __file__)
 
 app = FastAPI()
+
+# ---------------- CORS CONFIG ----------------
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ---------------- CONFIG ----------------
 
@@ -318,39 +329,131 @@ def delay_impact(station:str):
 # ---------------- AI ASSISTANT ----------------
 
 @app.get("/chat", tags=["AI Assistant"])
-def chat(query:str):
+def chat(query: str):
 
-    source,destination = extract_stations(query)
+    q = query.lower()
 
-    if "route" in query.lower() and source and destination:
+    source, destination = extract_stations(query)
 
-        result = smart_route(source,destination)
+    # ---------------- ROUTE INTENT ----------------
+    if ("route" in q or "best way" in q or "travel" in q) and source and destination:
+
+        result = smart_route(source, destination)
 
         route = " → ".join(result["best_route"])
 
-        prompt=f"""
-Route: {route}
-Predicted delay: {result['predicted_delay_minutes']} minutes
+        prompt = f"""
+A passenger wants to travel.
 
-Explain this route simply to a passenger.
+Best route: {route}
+Predicted delay: {result['predicted_delay_minutes']} minutes
+Total travel time: {result['best_total_travel_time_minutes']} minutes
+
+Explain this route in simple terms for the passenger.
 """
 
         explanation = ask_llm(prompt)
 
-        return {"route_result":result,"assistant_response":explanation}
+        return {
+            "intent": "smart_route",
+            "route_result": result,
+            "assistant_response": explanation
+        }
 
-    if "delay" in query.lower():
+    # ---------------- DELAY INTENT ----------------
+    if "delay" in q or "disruption" in q:
 
-        station,_ = extract_stations(query)
+        station, _ = extract_stations(query)
 
         if station:
 
             result = delay_impact(station)
 
-            explanation = ask_llm(f"Explain delay propagation for {station}")
+            prompt = f"""
+A delay occurred at station {station}.
 
-            return {"delay_impact":result,"assistant_response":explanation}
+Directly affected stations: {result['directly_affected']}
+Secondary impact stations: {result['secondary_impact']}
 
-    return {"assistant_response":ask_llm(query)}
+Explain how the delay spreads through the railway network.
+"""
 
+            explanation = ask_llm(prompt)
+
+            return {
+                "intent": "delay_analysis",
+                "delay_impact": result,
+                "assistant_response": explanation
+            }
+
+    # ---------------- CRITICAL HUB INTENT ----------------
+    if "critical" in q or "important station" in q or "hub" in q:
+
+        result = critical_stations()
+
+        prompt = f"""
+The most critical railway stations based on network centrality are:
+
+{result['critical_stations']}
+
+Explain why these stations are important in the railway network.
+"""
+
+        explanation = ask_llm(prompt)
+
+        return {
+            "intent": "critical_stations",
+            "critical_stations": result,
+            "assistant_response": explanation
+        }
+
+    # ---------------- DEMAND / CONGESTION ----------------
+    if "crowd" in q or "busy" in q or "demand" in q:
+
+        station, _ = extract_stations(query)
+
+        if station:
+
+            result = station_demand(station)
+
+            prompt = f"""
+Station: {station}
+Connections: {result['connections']}
+Demand level: {result['demand_level']}
+
+Explain what this demand level means for passengers.
+"""
+
+            explanation = ask_llm(prompt)
+
+            return {
+                "intent": "station_demand",
+                "station_demand": result,
+                "assistant_response": explanation
+            }
+
+    # ---------------- TICKET CONFIRMATION ----------------
+    if "ticket" in q or "waitlist" in q or "confirm" in q:
+
+        result = ticket_confirmation(waitlist=20, days_before=10)
+
+        prompt = f"""
+Ticket confirmation probability is {result['confirmation_probability']}.
+
+Explain what this means for the passenger.
+"""
+
+        explanation = ask_llm(prompt)
+
+        return {
+            "intent": "ticket_prediction",
+            "ticket_prediction": result,
+            "assistant_response": explanation
+        }
+
+    # ---------------- DEFAULT LLM RESPONSE ----------------
+    return {
+        "intent": "general_query",
+        "assistant_response": ask_llm(query)
+    }
 print("ENDPOINTS LOADED")

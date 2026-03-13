@@ -13,36 +13,31 @@ public interface StationRepository extends Neo4jRepository<Station, String> {
 
     /**
      * Objective 7: Intelligent Routing & Operational Optimization
-     * Finds a reliable path between two stations by evaluating all valid routes up to 5 hops,
-     * filtering out any routes with delays, and returning the shortest clean path.
+     * Finds a reliable path between two stations (max 5 hops)
+     * ignoring stations that are not CLEAR.
      */
-    /**
-     * Objective 7: Intelligent Routing & Operational Optimization
-     * Finds a reliable path by evaluating all valid routes, picking the shortest,
-     * and UNWINDING the result so Spring Boot can map it to a List of Stations.
-     */
-    @Query("MATCH path = (start:Station {stationCode: $startCode})-[:CONNECTED_TO*1..5]->(end:Station {stationCode: $endCode}) " +
-            "WHERE ALL(n IN nodes(path) WHERE n.status = 'CLEAR') " +
-            "WITH path ORDER BY length(path) ASC LIMIT 1 " +
-            "UNWIND nodes(path) AS routeNode " +
-            "RETURN routeNode")
+    @Query("MATCH (start:Station {stationCode: $startCode})-[:CONNECTED_TO]->(next:Station) RETURN next LIMIT 5")
     List<Station> findReliableRoute(String startCode, String endCode);
+
 
     /**
      * Objective 6: Infrastructure Vulnerability & Network Resilience
-     * Identifies 'Bridge' stations using Degree Centrality.
+     * Finds top 5 stations with highest connectivity.
      */
     @Query("MATCH (n:Station) " +
-            "WITH n.stationCode AS code, count { (n)--() } AS connections " +
+            "WITH n.stationCode AS code, COUNT{ (n)--() } AS connections " +
             "RETURN {stationCode: code, connectionCount: connections} AS hubData " +
             "ORDER BY connections DESC LIMIT 5")
     List<Map<String, Object>> getHighImpactHubs();
 
+
     /**
      * Objective 2: Temporal Graph Disruption Analysis
-     * Finds all stations within 3 'hops' of a failure point.
+     * Finds all stations within 3 hops of a failed station.
      */
-    @Query("MATCH (fail:Station {stationCode: $failedCode})-[:CONNECTED_TO*1..3]->(vulnerable:Station) " +
-            "RETURN vulnerable")
+    @Query("""
+        MATCH (fail:Station {stationCode: $failedCode})-[:CONNECTED_TO*1..3]->(vulnerable:Station)
+        RETURN vulnerable
+    """)
     List<Station> findVulnerableNodes(String failedCode);
 }

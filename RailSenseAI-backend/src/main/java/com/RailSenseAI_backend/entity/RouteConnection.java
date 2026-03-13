@@ -3,24 +3,54 @@ package com.RailSenseAI_backend.entity;
 import org.springframework.data.neo4j.core.schema.RelationshipId;
 import org.springframework.data.neo4j.core.schema.RelationshipProperties;
 import org.springframework.data.neo4j.core.schema.TargetNode;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
-@RelationshipProperties // Tells Neo4j this data lives on the line connecting two nodes [cite: 16]
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+@RelationshipProperties
 public class RouteConnection {
 
     @RelationshipId
-    private Long id; // Neo4j requires an internal ID for relationships
+    private Long id;
 
     @TargetNode
-    private Station targetStation; // The station this track leads to
+    private Station targetStation;
 
-    private Integer distance; // Distance in kilometers
+    private Integer distance;
 
-    // The critical metric for Objective 2 cascades [cite: 26, 27]
     private Integer delayMinutes;
+
+    public RouteConnection() {
+    }
+
+    public RouteConnection(Station targetStation, Integer distance, Integer delayMinutes) {
+        this.targetStation = targetStation;
+        this.distance = distance;
+        this.delayMinutes = delayMinutes;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Station getTargetStation() {
+        return targetStation;
+    }
+
+    public Integer getDistance() {
+        return distance;
+    }
+
+    public Integer getDelayMinutes() {
+        return delayMinutes;
+    }
+
+    public void setDelayMinutes(Integer delayMinutes) {
+        this.delayMinutes = delayMinutes;
+    }
+
+    public void setDistance(Integer distance) {
+        this.distance = distance;
+    }
+
+    public void setTargetStation(Station targetStation) {
+        this.targetStation = targetStation;
+    }
 }

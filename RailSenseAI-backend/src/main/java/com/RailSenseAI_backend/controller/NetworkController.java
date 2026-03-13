@@ -4,6 +4,7 @@ import com.RailSenseAI_backend.dto.SimulationRequest;
 import com.RailSenseAI_backend.entity.NetworkLog;
 import com.RailSenseAI_backend.repository.NetworkLogRepository;
 import com.RailSenseAI_backend.service.*;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,7 +14,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/rail-intelligence")
-// 🚀 FIX: Swapped 'origins' for 'originPatterns' to satisfy Spring Security
 @CrossOrigin(originPatterns = "*", allowedHeaders = "*", allowCredentials = "true")
 public class NetworkController {
 
@@ -27,7 +27,7 @@ public class NetworkController {
     private CongestionService congestionService;
 
     @Autowired
-    private CrowdIntelliegenceService crowdService;
+    private CrowdIntelligenceService crowdService;
 
     @Autowired
     private AiAssistantService aiAssistantService;
@@ -35,69 +35,121 @@ public class NetworkController {
     @Autowired
     private NetworkLogRepository logRepo;
 
+
+    // ---------------- DASHBOARD TOPOLOGY ----------------
+
     @GetMapping("/dashboard/topology")
     public ResponseEntity<Map<String, Object>> getTopology() {
         return ResponseEntity.ok(railwayService.getNetworkTopology());
     }
 
+
+    // ---------------- DELAY CASCADE (AI ENGINE) ----------------
+
     @PostMapping("/simulate/cascade")
-    public ResponseEntity<List<String>> runCascadeSimulation(@RequestBody SimulationRequest request) {
-        List<String> affected = railwayService.predictDelayCascade(
-                request.getStationCode(),
-                request.getDelayMinutes()
+    public ResponseEntity<Object> runCascadeSimulation(@RequestBody SimulationRequest request) {
+
+        return ResponseEntity.ok(
+                aiAssistantService.getDelayImpact(request.getStationCode())
         );
-        return ResponseEntity.ok(affected);
     }
+
+
+    // ---------------- SIMULATION HISTORY ----------------
 
     @GetMapping("/simulation/history")
     public ResponseEntity<List<NetworkLog>> getSimulationHistory() {
         return ResponseEntity.ok(logRepo.findTop10ByOrderByTimestampDesc());
     }
 
+
+    // ---------------- NETWORK RESILIENCE (AI GRAPH ANALYSIS) ----------------
+
     @GetMapping("/analytics/resilience-report")
-    public ResponseEntity<Map<String, Object>> getResilienceReport(
+    public ResponseEntity<Object> getResilienceReport(
             @RequestParam(defaultValue = "NDLS") String sourceCode,
             @RequestParam(defaultValue = "MAS") String targetCode) {
-        return ResponseEntity.ok(railwayService.analyzeNetworkResilience(sourceCode, targetCode));
+
+        return ResponseEntity.ok(
+                aiAssistantService.getCriticalStations()
+        );
     }
+
+
+    // ---------------- PASSENGER ROUTE PLANNER (AI ROUTING) ----------------
 
     @GetMapping("/passenger/route-planner")
-    public ResponseEntity<Map<String, Object>> getPassengerRoute(
+    public ResponseEntity<Object> getPassengerRoute(
             @RequestParam String sourceCode,
             @RequestParam String targetCode) {
-        Map<String, Object> report = railwayService.analyzeNetworkResilience(sourceCode, targetCode);
-        report.put("intelligenceSource", "Passenger Smart-Routing Layer");
-        return ResponseEntity.ok(report);
+
+        return ResponseEntity.ok(
+                aiAssistantService.getSmartRoute(sourceCode, targetCode)
+        );
     }
 
+
+    // ---------------- AI CHAT ----------------
+
     @PostMapping("/ai/chat")
-    public ResponseEntity<Map<String, String>> chatWithAI(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<Map<String, String>> chatWithAI(
+            @RequestBody Map<String, String> payload) {
+
         String userQuery = payload.get("query");
+
         String response = aiAssistantService.processAiQuery(userQuery);
+
         return ResponseEntity.ok(Map.of("response", response));
     }
 
+
+    // ---------------- CONGESTION ANALYSIS (AI DEMAND MODEL) ----------------
+
     @GetMapping("/analytics/congestion-hotspots")
-    public ResponseEntity<List<Map<String, Object>>> getHotspots() {
-        return ResponseEntity.ok(congestionService.identifyCongestionHotspots());
+    public ResponseEntity<Object> getHotspots(
+            @RequestParam(defaultValue = "NDLS") String station) {
+
+        return ResponseEntity.ok(
+                aiAssistantService.getStationDemand(station)
+        );
     }
 
+
+    // ---------------- CROWD LEVEL ----------------
+
     @GetMapping("/analytics/crowd-levels/{stationCode}")
-    public ResponseEntity<Map<String, Object>> getCrowdLevels(@PathVariable String stationCode) {
-        return ResponseEntity.ok(crowdService.getCrowdInsight(stationCode));
+    public ResponseEntity<Map<String, Object>> getCrowdLevels(
+            @PathVariable String stationCode) {
+
+        return ResponseEntity.ok(
+                crowdService.getCrowdInsight(stationCode)
+        );
     }
+
+
+    // ---------------- TICKET PREDICTION ----------------
 
     @GetMapping("/passenger/ticket-odds")
     public ResponseEntity<Map<String, Object>> checkTicket(
             @RequestParam String trainNo,
             @RequestParam int wl,
             @RequestParam String stationCode) {
-        return ResponseEntity.ok(ticketService.getConfirmationOdds(trainNo, wl, stationCode));
+
+        return ResponseEntity.ok(
+                ticketService.getConfirmationOdds(trainNo, wl, stationCode)
+        );
     }
+
+
+    // ---------------- RESET NETWORK ----------------
 
     @PostMapping("/simulation/reset")
     public ResponseEntity<String> resetSimulation() {
+
         railwayService.resetNetwork();
-        return ResponseEntity.ok("Operational Reset: Network status reset to CLEAR for all stations.");
+
+        return ResponseEntity.ok(
+                "Operational Reset: Network status reset to CLEAR for all stations."
+        );
     }
 }
