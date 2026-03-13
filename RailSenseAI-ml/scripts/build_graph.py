@@ -38,6 +38,7 @@ print("\nGraph created")
 print("Total stations:", G.number_of_nodes())
 print("Total routes:", G.number_of_edges())
 
+
 # ---------------- GRAPH TEST ----------------
 
 print("\nNeighbors of PUNE:")
@@ -100,3 +101,5 @@ alt = alternative_routes(source, destination)
 
 for i, r in enumerate(alt):
     print("Route", i + 1, ":", r, "| Distance:", route_distance(r), "km")
+
+
